@@ -7,11 +7,11 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
     type-maps = {
-      url = "git+ssh://git@methanium.net/tensamin/mtp-type-maps?ref=main";
+      url = "git+ssh://git@github.com/TensaminDev/Mtp-Type-Maps.git?ref=main";
       flake = false;
     };
     iota = {
-      url = "git+ssh://git@methanium.net/tensamin/iota?ref=main";
+      url = "git+ssh://git@github.com/TensaminDev/Iota.git?ref=main";
       flake = false;
     };
   };

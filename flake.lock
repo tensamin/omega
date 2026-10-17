@@ -9,12 +9,12 @@
         "rev": "976ffde7a86b2f3f9884035b2a3a9ffb9aefe501",
         "revCount": 329,
         "type": "git",
-        "url": "ssh://git@methanium.net/tensamin/iota"
+        "url": "ssh://git@github.com/TensaminDev/Iota.git"
       },
       "original": {
         "ref": "main",
         "type": "git",
-        "url": "ssh://git@methanium.net/tensamin/iota"
+        "url": "ssh://git@github.com/TensaminDev/Iota.git"
       }
     },
     "nixpkgs": {
@@ -70,12 +70,12 @@
         "rev": "4f18c7a0d9b04d38a77fbb011c4f0b21c25bf7bf",
         "revCount": 28,
         "type": "git",
-        "url": "ssh://git@methanium.net/tensamin/mtp-type-maps"
+        "url": "ssh://git@github.com/TensaminDev/Mtp-Type-Maps.git"
       },
       "original": {
         "ref": "main",
         "type": "git",
-        "url": "ssh://git@methanium.net/tensamin/mtp-type-maps"
+        "url": "ssh://git@github.com/TensaminDev/Mtp-Type-Maps.git"
       }
     }
   },
