@@ -11,7 +11,8 @@
       flake = false;
     };
     iota = {
-      url = "github:TensaminDev/Iota/main";
+      # Cargo.lock is resolved against this revision of the copied identity crate.
+      url = "github:TensaminDev/Iota/c78116ce273983260f929dbac1f009914e34c856";
       flake = false;
     };
   };

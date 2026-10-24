@@ -12,8 +12,8 @@
       },
       "original": {
         "owner": "TensaminDev",
-        "ref": "main",
         "repo": "Iota",
+        "rev": "c78116ce273983260f929dbac1f009914e34c856",
         "type": "github"
       }
     },
