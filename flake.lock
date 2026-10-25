@@ -64,11 +64,11 @@
     "type-maps": {
       "flake": false,
       "locked": {
-        "lastModified": 1790572556,
-        "narHash": "sha256-ugNZR2Be9N9UjG0aVN8Yrk4hYOVC2edjtC9xBhbW35w=",
+        "lastModified": 1792833625,
+        "narHash": "sha256-Ndd7moZJU3Uo48WmIcH6mK23DBqCWLUzvE0hsiO/E+s=",
         "ref": "main",
-        "rev": "4f18c7a0d9b04d38a77fbb011c4f0b21c25bf7bf",
-        "revCount": 28,
+        "rev": "f0f856ca1d5fc3ca2b05a71f287c226ea58a6c60",
+        "revCount": 32,
         "type": "git",
         "url": "ssh://git@github.com/TensaminDev/Mtp-Type-Maps.git"
       },
