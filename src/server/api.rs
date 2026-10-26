@@ -89,6 +89,9 @@ async fn build_omikron_response(state: &OmegaState, omikron_id: i64) -> Result<O
         .connected_omikron(omikron_id)
         .ok_or(OmegaError::NotFound)?;
     let omikron = get_omikron_by_id(omikron_id.into()).await?;
+    state
+        .connected_omikron(omikron_id)
+        .ok_or(OmegaError::NotFound)?;
     Ok(OmikronResponse {
         status: "success",
         id: omikron.id.0,
@@ -395,7 +398,11 @@ pub async fn handle(
             status.as_u16(),
             started.elapsed().as_millis()
         );
-        with_cors(response.header("x-request-id", &request_id.to_string()))
+        with_cors(
+            response
+                .header("x-request-id", &request_id.to_string())
+                .header("cache-control", "no-store"),
+        )
     };
     if method != Method::OPTIONS && !middleware::allow(request.remote_addr.ip(), &path) {
         return finish(

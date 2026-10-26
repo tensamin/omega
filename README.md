@@ -3,6 +3,23 @@ The Omega is Tensamin's central Server. It maintains the centralized user Regist
 
 On first start Omega creates an unencrypted private keyring at `./omega.mk` and the matching public bundle at `./omega.mpkb`. Existing identity files are loaded fail-closed, so a malformed keyring or mismatched public bundle stops startup. A missing public bundle is rebuilt from a valid private keyring without generating a new identity.
 
+## Building the workspace sources
+
+Keep the `omega`, `mtp`, `tau`, and `iota` Git checkouts alongside each other. Run these
+commands from the `omega` checkout so the local Git input URLs resolve correctly:
+
+```sh
+nix flake update mtp-src tau-src iota-src type-maps
+nix develop --command cargo check --locked
+nix build --no-link .#default
+```
+
+The flake locks the sibling sources and `mtp-type-maps` by content and rewrites
+Cargo paths to those store inputs. Git excludes untracked files, so add new
+source files before refreshing inputs. Commit the sibling sources and refresh
+`flake.lock` before publishing a release. Cargo forces the checkout-local map;
+the sandboxed package uses the locked copy of that same map.
+
 ## MTP routing contract
 
 Omega preserves the MTP distinction between an absent routing field and a

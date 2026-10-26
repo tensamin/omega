@@ -7,11 +7,19 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
     type-maps = {
-      url = "git+ssh://git@github.com/TensaminDev/Mtp-Type-Maps.git?ref=main";
+      url = "git+file:mtp-type-maps";
       flake = false;
     };
-    iota = {
-      url = "git+ssh://git@github.com/TensaminDev/Iota.git?ref=main";
+    iota-src = {
+      url = "git+file:../iota";
+      flake = false;
+    };
+    mtp-src = {
+      url = "git+file:../mtp";
+      flake = false;
+    };
+    tau-src = {
+      url = "git+file:../tau";
       flake = false;
     };
   };
@@ -21,7 +29,9 @@
       nixpkgs,
       rust-overlay,
       type-maps,
-      iota,
+      iota-src,
+      mtp-src,
+      tau-src,
       ...
     }:
     let
@@ -113,8 +123,12 @@
             chmod -R u+w "$out"
             rm -rf "$out/mtp-type-maps"
             cp -r ${type-maps} "$out/mtp-type-maps"
-            cp -r ${iota}/iota-identity "$out/iota-identity"
-            substituteInPlace "$out/Cargo.toml" --replace-fail '../iota/iota-identity' './iota-identity'
+            substituteInPlace "$out/Cargo.toml" \
+              --replace-fail 'path = "../iota/iota-identity"' 'path = "${iota-src}/iota-identity"' \
+              --replace-fail 'path = "../tau"' 'path = "${tau-src}"' \
+              --replace-fail 'path = "../mtp"' 'path = "${mtp-src}"' \
+              --replace-fail 'path = "../mtp/type-map"' 'path = "${mtp-src}/type-map"' \
+              --replace-fail 'path = "../mtp/crypto"' 'path = "${mtp-src}/crypto"'
           '';
         in
         {
@@ -125,7 +139,7 @@
               pname = "omega";
               version = "0.1.0";
               src = source;
-              hash = "sha256-aTRNBKgSfwNGp/TeiFy3ZITPR/i+aPScXsVRwS2kdWo=";
+              hash = "sha256-qNrHbEqrF7MvgO3EyWymp4atgFnJaHoK/fQsdKINEY8=";
             };
           };
           container = self.lib.mkContainer {
