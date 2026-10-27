@@ -228,12 +228,9 @@ async fn allocate_registration_with_pool(
 }
 
 pub(crate) fn is_duplicate_key(error: &sqlx::Error) -> bool {
-    error.as_database_error().is_some_and(|database| {
-        // MySQL's generic database-error API exposes SQLSTATE (23000) as
-        // `code()`.  The driver-specific duplicate-key number is retained in
-        // the diagnostic message.
-        database.code().as_deref() == Some("23000") && database.message().contains("1062")
-    })
+    error
+        .as_database_error()
+        .is_some_and(|database| database.is_unique_violation())
 }
 
 const USER_BY_USERNAME_QUERY: &str = "SELECT id, iota_id, username, display, status, presence_preference, about, avatar, sub_level, sub_end, public_key, token, CAST(UNIX_TIMESTAMP(created_at) * 1000 AS SIGNED) AS created_at FROM users WHERE username = ?";
@@ -506,27 +503,35 @@ async fn update_user_patch_with_pool(
     {
         let mut fields = query.separated(", ");
         if let Some(value) = &patch.username {
-            fields.push("username = ").push_bind(value.as_bytes());
+            fields
+                .push("username = ")
+                .push_bind_unseparated(value.as_bytes());
         }
         if let Some(value) = &patch.display {
-            fields.push("display = ").push_bind(value.as_bytes());
+            fields
+                .push("display = ")
+                .push_bind_unseparated(value.as_bytes());
         }
         if let Some(value) = &patch.avatar {
-            fields.push("avatar = ").push_bind(value);
+            fields.push("avatar = ").push_bind_unseparated(value);
         }
         if let Some(value) = &patch.about {
-            fields.push("about = ").push_bind(value.as_bytes());
+            fields
+                .push("about = ")
+                .push_bind_unseparated(value.as_bytes());
         }
         if let Some(value) = &patch.status {
-            fields.push("status = ").push_bind(value.as_bytes());
+            fields
+                .push("status = ")
+                .push_bind_unseparated(value.as_bytes());
         }
         if let Some(value) = &public_key {
-            fields.push("public_key = ").push_bind(value);
+            fields.push("public_key = ").push_bind_unseparated(value);
         }
         if let Some(value) = &patch.presence_preference {
             fields
                 .push("presence_preference = ")
-                .push_bind(value.to_string().into_bytes());
+                .push_bind_unseparated(value.to_string().into_bytes());
         }
     }
     query.push(" WHERE id = ").push_bind(id.0);

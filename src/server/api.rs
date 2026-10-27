@@ -135,7 +135,7 @@ fn now_millis() -> i64 {
         .unwrap_or(0)
 }
 
-async fn federation_user_descriptor(
+pub(crate) async fn federation_user_descriptor(
     user: crate::models::User,
     identity: &OmegaIdentity,
 ) -> Result<iota_identity::PrincipalDescriptorWireV1> {

@@ -64,6 +64,8 @@ pub async fn get_user(
             .await;
     };
     let id = user.id.0;
+    let signed_descriptor =
+        crate::server::api::federation_user_descriptor(user.clone(), &state.identity).await;
     let iota_id = user.iota_id.map(|id| id.0);
     let username = user.username.clone();
     let display = user
@@ -100,6 +102,20 @@ pub async fn get_user(
             DataType::SubEnd,
             DataValue::SignedNumber(user.sub_end.into()),
         );
+    if let Ok(descriptor) = signed_descriptor {
+        response = response
+            .add_typed_default(
+                DataType::Json,
+                DataValue::Bytes(
+                    serde_json::to_vec(&descriptor)
+                        .map_err(|error| OmegaError::Validation(error.to_string()))?,
+                ),
+            )
+            .add_typed_default(
+                DataType::PublicKeys,
+                DataValue::Str(state.identity.public_key_bundle().try_to_base64()?),
+            );
+    }
     if let Some(status) = user.status.filter(|value| !value.is_empty()) {
         response = response.add_typed_default(DataType::Status, DataValue::Str(status));
     }
