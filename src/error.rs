@@ -64,21 +64,46 @@ impl From<sqlx::Error> for OmegaError {
 }
 
 impl OmegaError {
+    pub fn code(&self) -> &'static str {
+        match self {
+            Self::Validation(_) | Self::Invitation(_) => "invalid_request",
+            Self::NotFound => "not_found",
+            Self::DatabaseNotInitialized
+            | Self::Database(
+                sqlx::Error::PoolTimedOut
+                | sqlx::Error::PoolClosed
+                | sqlx::Error::Io(_)
+                | sqlx::Error::Tls(_),
+            ) => "database_unavailable",
+            Self::Database(_) => "database_failed",
+            Self::NotAuthenticated | Self::AuthenticationFailed => "authentication_required",
+            Self::Transport(_) | Self::NotConnected | Self::SendError(_) => {
+                "dependency_unavailable"
+            }
+            Self::InvalidResponse => "invalid_upstream_response",
+            Self::Crypto(_) | Self::Identity(_) | Self::Io(_) => "internal_error",
+        }
+    }
+
     pub fn status_code(&self) -> http::StatusCode {
         match self {
             Self::Validation(_) | Self::Invitation(_) => http::StatusCode::BAD_REQUEST,
             Self::NotFound => http::StatusCode::NOT_FOUND,
+            Self::NotAuthenticated | Self::AuthenticationFailed => http::StatusCode::UNAUTHORIZED,
             Self::DatabaseNotInitialized
-            | Self::Database(_)
-            | Self::Crypto(_)
-            | Self::Identity(_)
+            | Self::Database(
+                sqlx::Error::PoolTimedOut
+                | sqlx::Error::PoolClosed
+                | sqlx::Error::Io(_)
+                | sqlx::Error::Tls(_),
+            )
             | Self::Transport(_)
             | Self::NotConnected
-            | Self::NotAuthenticated
-            | Self::InvalidResponse
-            | Self::AuthenticationFailed
-            | Self::SendError(_)
-            | Self::Io(_) => http::StatusCode::INTERNAL_SERVER_ERROR,
+            | Self::SendError(_) => http::StatusCode::SERVICE_UNAVAILABLE,
+            Self::InvalidResponse => http::StatusCode::BAD_GATEWAY,
+            Self::Database(_) | Self::Crypto(_) | Self::Identity(_) | Self::Io(_) => {
+                http::StatusCode::INTERNAL_SERVER_ERROR
+            }
         }
     }
 }

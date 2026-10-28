@@ -12,6 +12,7 @@ pub(crate) fn with_cors(response: HttpResponse) -> HttpResponse {
         .header("access-control-allow-origin", crate::config::cors_origin())
         .header("access-control-allow-methods", "GET, POST, OPTIONS")
         .header("access-control-allow-headers", "*")
+        .header("access-control-expose-headers", "x-request-id")
         .header("access-control-allow-private-network", "true")
 }
 

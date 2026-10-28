@@ -6,6 +6,35 @@ use std::{future::Future, pin::Pin, sync::Arc};
 
 type RouteFuture = Pin<Box<dyn Future<Output = HttpResponse> + Send>>;
 
+struct TransportMetrics;
+
+impl mtp::webserver::WebServerMetrics for TransportMetrics {
+    fn error_occurred(&self, error: &mtp::webserver::WebServerError) {
+        crate::log_event!(
+            0,
+            crate::util::logger::PrintType::Omega,
+            crate::util::logger::LogLevel::Error,
+            "transport.error",
+            "error={}",
+            error
+        );
+    }
+
+    fn request_completed(&self, _path: &str, status: u16, duration: std::time::Duration) {
+        if status >= 400 {
+            crate::log_event!(
+                0,
+                crate::util::logger::PrintType::Omega,
+                crate::util::logger::LogLevel::Warn,
+                "transport.request_failed",
+                "status={} elapsed_ms={}",
+                status,
+                duration.as_millis()
+            );
+        }
+    }
+}
+
 fn api_handler(
     state: Arc<OmegaState>,
 ) -> impl Fn(HttpRequest, HttpResponse) -> RouteFuture + Send + Sync + 'static {
@@ -29,6 +58,7 @@ pub fn build_web_config(
     state: Arc<OmegaState>,
 ) -> Result<WebServerConfig, mtp::webserver::RouterError> {
     WebServerConfig::new()
+        .with_metrics(Arc::new(TransportMetrics))
         .route("/.well-known/tensamin", api_handler(state.clone()))?
         .route("/api/download/iota_frontend", api_handler(state.clone()))?
         .route("/api/get/omikron", api_handler(state.clone()))?

@@ -49,14 +49,20 @@ fn route_name(parts: &[&str]) -> &'static str {
     }
 }
 
-fn error_body(error: &OmegaError) -> String {
-    json(&StatusResponse {
-        status: match error {
+fn error_body(error: &OmegaError, request_id: Uuid, method: &Method) -> String {
+    json(&serde_json::json!({
+        "status": match error {
             OmegaError::Validation(_) => "error_bad_request",
             OmegaError::NotFound => "error_not_found",
             _ => "error",
         },
-    })
+        "code": error.code(),
+        "message": "The service could not complete the request",
+        "request_id": request_id.to_string(),
+        // Only safe reads may be replayed after an uncertain dependency failure.
+        "retryable": (*method == Method::GET || *method == Method::HEAD)
+            && error.status_code() == StatusCode::SERVICE_UNAVAILABLE,
+    }))
 }
 
 fn user_response(user: crate::models::User) -> Result<UserResponse> {
@@ -120,7 +126,7 @@ async fn registration_omikron_for_iota(
         Some(id) => id,
         None => get_random_omikron(state)
             .await
-            .map_err(|_| OmegaError::NotFound)?
+            .map_err(|_| OmegaError::NotConnected)?
             .get_omikron_id()
             .await
             .ok_or(OmegaError::NotFound)?,
@@ -253,7 +259,7 @@ async fn route(
         ["api", "get", "omikron"] => {
             let connection = get_random_omikron(state)
                 .await
-                .map_err(|_| OmegaError::NotFound)?;
+                .map_err(|_| OmegaError::NotConnected)?;
             let id = connection
                 .get_omikron_id()
                 .await
@@ -283,7 +289,7 @@ async fn route(
                     None => {
                         get_random_omikron(state)
                             .await
-                            .map_err(|_| OmegaError::NotFound)?
+                            .map_err(|_| OmegaError::NotConnected)?
                             .get_omikron_id()
                             .await
                     }
@@ -365,12 +371,7 @@ async fn route(
             let user = get_by_user_id(UserId::from(id)).await?;
             Ok((StatusCode::OK, json(&user_response(user)?)))
         }
-        _ => Ok((
-            StatusCode::NOT_FOUND,
-            json(&StatusResponse {
-                status: "error_not_found",
-            }),
-        )),
+        _ => Err(OmegaError::NotFound),
     }
 }
 
@@ -508,7 +509,26 @@ pub async fn handle(
         &state,
     )
     .await
-    .unwrap_or_else(|error| (error.status_code(), error_body(&error)));
+    .unwrap_or_else(|error| {
+        crate::log_event!(
+            0,
+            crate::util::logger::PrintType::Omega,
+            if error.status_code().is_server_error() {
+                crate::util::logger::LogLevel::Error
+            } else {
+                crate::util::logger::LogLevel::Warn
+            },
+            "http.request_failed",
+            "request_id={} method={} route={} error_class={} elapsed_ms={} error={}",
+            request_id,
+            method,
+            route_label,
+            error.code(),
+            started.elapsed().as_millis(),
+            error
+        );
+        (error.status_code(), error_body(&error, request_id, &method))
+    });
     finish(response.status(status).body(body), status)
 }
 
