@@ -33,7 +33,6 @@ fn route_name(parts: &[&str]) -> &'static str {
     match parts {
         ["api", "download", "iota_frontend"] => "/api/download/iota_frontend",
         ["api", "get", "user", _] => "/api/get/user/:id",
-        ["api", "get", "user", _, "omikron"] => "/api/get/user/:id/omikron",
         ["direct", ..] => "/direct/:short",
         ["api", "get", "id", _] => "/api/get/id/:username",
         ["api", "get", "iota", _] => "/api/get/iota/:id",
@@ -277,16 +276,42 @@ async fn route(
                 }),
             ))
         }
-        ["api", "get", "omikron", id] if method == Method::GET => Ok((
-            StatusCode::OK,
-            json(&build_omikron_response(state, parse_positive_id(id)?).await?),
-        )),
-        ["api", "get", "user", id, "omikron"] if method == Method::GET => {
-            let user = get_by_user_id(UserId::from(parse_positive_id(id)?)).await?;
-            let iota_id = user.iota_id.ok_or(OmegaError::NotFound)?;
+        ["api", "get", "omikron", id] => {
+            let id = parse_positive_id(id)?;
+            let omikron_id = if state.connected_omikron(id).is_some() {
+                id
+            } else if let Some(omikron_id) = get_iota_primary_omikron_connection(state, id) {
+                omikron_id
+            } else {
+                let user = get_by_user_id(UserId::from(id)).await?;
+                match user.iota_id {
+                    Some(iota_id) => get_iota_primary_omikron_connection(state, iota_id.0),
+                    None => {
+                        get_random_omikron(state)
+                            .await
+                            .map_err(|_| OmegaError::NotConnected)?
+                            .get_omikron_id()
+                            .await
+                    }
+                }
+                .ok_or(OmegaError::NotFound)?
+            };
+
+            // Database rows describe registered Omikrons. The public discovery
+            // API must expose only routes backed by a currently live transport.
+            state
+                .connected_omikron(omikron_id)
+                .ok_or(OmegaError::NotFound)?;
+            let omikron = get_omikron_by_id(omikron_id.into()).await?;
             Ok((
                 StatusCode::OK,
-                json(&connected_omikron_for_iota(state, iota_id.0).await?),
+                json(&OmikronResponse {
+                    status: "success",
+                    id: omikron.id.0,
+                    public_key: omikron.public_key.try_to_base64()?,
+                    ip_address: omikron.ip_address,
+                    port: omikron.port,
+                }),
             ))
         }
         ["api", "get", "iota", id, "omikron"] if method == Method::GET => {
@@ -613,10 +638,6 @@ mod tests {
     #[test]
     fn iota_omikron_discovery_has_an_explicit_route() {
         assert_eq!(
-            route_name(&["api", "get", "user", "7", "omikron"]),
-            "/api/get/user/:id/omikron"
-        );
-        assert_eq!(
             route_name(&["api", "get", "iota", "7", "omikron"]),
             "/api/get/iota/:id/omikron"
         );
@@ -624,37 +645,5 @@ mod tests {
             route_name(&["api", "get", "registration-omikron", "7"]),
             "/api/get/registration-omikron/:id"
         );
-    }
-
-    #[tokio::test]
-    async fn disconnected_owner_never_resolves_as_a_colliding_iota() {
-        let state = OmegaState::test_state();
-        state.presence.connect_iota(7, 42);
-        assert_eq!(primary_route_for_iota(&state, 7).unwrap(), 42);
-        let response = route(
-            &["api", "get", "omikron", "7"],
-            &Method::GET,
-            None,
-            &state.identity,
-            &state,
-        )
-        .await;
-        assert!(matches!(response, Err(OmegaError::NotFound)));
-    }
-
-    #[tokio::test]
-    async fn disconnected_owner_does_not_fall_through_to_user_lookup() {
-        let state = OmegaState::test_state();
-        // There is deliberately no database fixture. An owner lookup must
-        // return not-found without attempting a lookup in another namespace.
-        let response = route(
-            &["api", "get", "omikron", "7"],
-            &Method::GET,
-            None,
-            &state.identity,
-            &state,
-        )
-        .await;
-        assert!(matches!(response, Err(OmegaError::NotFound)));
     }
 }

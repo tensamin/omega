@@ -65,10 +65,6 @@ pub fn build_web_config(
         .route("/api/get/public_key", api_handler(state.clone()))?
         .route_pattern("/api/get/omikron/{id}", api_pattern_handler(state.clone()))?
         .route_pattern(
-            "/api/get/user/{id}/omikron",
-            api_pattern_handler(state.clone()),
-        )?
-        .route_pattern(
             "/api/get/registration-omikron/{id}",
             api_pattern_handler(state.clone()),
         )?

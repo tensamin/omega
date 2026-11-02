@@ -11,11 +11,8 @@ Available Routes:
 - /api/get/omikron
     Returns a randomly selected connected Omikron.
 - /api/get/omikron/{id}
-    Returns the connected Omikron with this Omikron ID, or not found.
-- /api/get/iota/{id}/omikron
-    Returns this Iota's primary connected Omikron, or not found.
-- /api/get/user/{id}/omikron
-    Returns the user's hosting Iota's primary connected Omikron, or not found.
+    Returns an Omikron by ID. If {id} is a connected Iota ID or user ID,
+    returns that account's primary connected Omikron instead.
 - /api/get/iota/{id}
     Returns the Iota's public identity data.
 - /api/get/user/{id}
