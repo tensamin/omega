@@ -30,6 +30,13 @@ use tokio_util::sync::CancellationToken;
 
 #[tokio::main]
 async fn main() {
+    let stop_signal = match shutdown_signal() {
+        Ok(signal) => signal,
+        Err(error) => {
+            eprintln!("Unable to install shutdown signal handler: {error}");
+            return;
+        }
+    };
     if default_provider().install_default().is_err() {
         println!("Error loading Provider");
         return;
@@ -110,7 +117,10 @@ async fn main() {
                 log_err!(0, PrintType::General, "Server error: {:?}", e);
             }
         }
-        _ = tokio::signal::ctrl_c() => {
+        result = stop_signal => {
+            if let Err(error) = result {
+                log_err!(0, PrintType::General, "Shutdown signal listener failed: {error}");
+            }
             log!("Shutting down on signal...");
             shutdown.cancel();
             if let Err(e) = server.await {
@@ -124,4 +134,65 @@ async fn main() {
     snapshot_outbox_worker.abort();
     provisioning_outbox_worker.abort();
     erasure_outbox_worker.abort();
+}
+
+fn shutdown_signal() -> std::io::Result<impl std::future::Future<Output = std::io::Result<()>>> {
+    #[cfg(unix)]
+    let mut terminate = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())?;
+    Ok(async move {
+        #[cfg(unix)]
+        {
+            tokio::select! {
+                result = tokio::signal::ctrl_c() => result,
+                _ = terminate.recv() => Ok(()),
+            }
+        }
+        #[cfg(not(unix))]
+        tokio::signal::ctrl_c().await
+    })
+}
+
+#[cfg(all(test, unix))]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn sigterm_uses_shutdown_path() {
+        use std::io::{BufRead, BufReader};
+        use std::process::{Command, Stdio};
+        if std::env::var_os("TENSAMIN_SHUTDOWN_TEST_CHILD").is_some() {
+            tokio::runtime::Runtime::new().unwrap().block_on(async {
+                let signal = shutdown_signal().unwrap();
+                println!("shutdown handler ready");
+                tokio::time::timeout(std::time::Duration::from_secs(5), signal)
+                    .await
+                    .expect("SIGTERM was not observed")
+                    .unwrap();
+            });
+            return;
+        }
+        let mut child = Command::new(std::env::current_exe().unwrap())
+            .args([
+                "--exact",
+                "tests::sigterm_uses_shutdown_path",
+                "--nocapture",
+            ])
+            .env("TENSAMIN_SHUTDOWN_TEST_CHILD", "1")
+            .stdout(Stdio::piped())
+            .spawn()
+            .unwrap();
+        let mut output = BufReader::new(child.stdout.take().unwrap()).lines();
+        let ready = output
+            .by_ref()
+            .any(|line| line.unwrap() == "shutdown handler ready");
+        assert!(ready, "child did not register its shutdown handler");
+        assert!(
+            Command::new("kill")
+                .args(["-TERM", &child.id().to_string()])
+                .status()
+                .unwrap()
+                .success()
+        );
+        assert!(child.wait().unwrap().success());
+    }
 }
