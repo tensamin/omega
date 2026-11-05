@@ -140,19 +140,18 @@ fn changed_states(
     state: &OmegaState,
     before: &HashMap<i64, UserStatus>,
     users: &[crate::models::User],
-) -> Vec<(i64, UserStatus)> {
+) -> Vec<(i64, UserStatus, u64)> {
     let mut changes = users
         .iter()
         .filter_map(|user| {
-            let after = user
-                .iota_id
-                .map(|iota_id| state.presence.resolve_public_state(user.id.0, iota_id.0))
-                .unwrap_or(UserStatus::user_offline);
-            (before.get(&user.id.0) != Some(&after)).then_some((user.id.0, after))
+            let (after, sequence) = state
+                .presence
+                .observe_public_state(user.id.0, user.iota_id.map(|id| id.0));
+            (before.get(&user.id.0) != Some(&after)).then_some((user.id.0, after, sequence))
         })
         .collect::<Vec<_>>();
-    changes.sort_by_key(|(user_id, _)| *user_id);
-    changes.dedup_by_key(|(user_id, _)| *user_id);
+    changes.sort_by_key(|(user_id, _, _)| *user_id);
+    changes.dedup_by_key(|(user_id, _, _)| *user_id);
     changes
 }
 
@@ -160,6 +159,8 @@ fn state_notification(
     subscriber: &crate::sql::user_online_tracker::PresenceSubscriber,
     user_id: i64,
     user_state: &UserStatus,
+    epoch: uuid::Uuid,
+    sequence: u64,
 ) -> CommunicationValue {
     CommunicationValue::new(CommunicationType::ClientChanged)
         .with_receiver(subscriber.user_id as u64)
@@ -169,16 +170,27 @@ fn state_notification(
         )
         .add_typed_default(DataType::UserId, DataValue::SignedNumber(user_id.into()))
         .add_typed_default(DataType::UserState, DataValue::Str(user_state.to_string()))
+        .add_typed_default(DataType::Uuid, DataValue::Str(epoch.to_string()))
+        .add_typed_default(
+            DataType::VersionNumber,
+            DataValue::UnsignedNumber(sequence.into()),
+        )
 }
 
-async fn publish_state_changes(state: &OmegaState, changes: &[(i64, UserStatus)]) {
+async fn publish_state_changes(state: &OmegaState, changes: &[(i64, UserStatus, u64)]) {
     let mut grouped = BTreeMap::<i64, Vec<CommunicationValue>>::new();
-    for (user_id, user_state) in changes {
+    for (user_id, user_state, sequence) in changes {
         for subscriber in state.presence.subscribers(*user_id) {
             grouped
                 .entry(subscriber.omikron_id)
                 .or_default()
-                .push(state_notification(&subscriber, *user_id, user_state));
+                .push(state_notification(
+                    &subscriber,
+                    *user_id,
+                    user_state,
+                    state.presence.observation_epoch,
+                    *sequence,
+                ));
         }
     }
     for (omikron_id, notifications) in grouped {

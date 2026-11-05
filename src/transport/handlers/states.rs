@@ -90,6 +90,7 @@ pub async fn get(
         requested_user_ids.push(user_id);
     }
 
+    let boundary = state.presence.observation_boundary();
     let users = match user_repo::get_users_by_ids(&requested_user_ids).await {
         Ok(users) => users,
         Err(_) => {
@@ -110,22 +111,31 @@ pub async fn get(
             missing_user_ids.push(user_id);
             continue;
         };
-        let status = user
-            .iota_id
-            .map(|iota_id| state.presence.resolve_public_state(user_id, iota_id.0))
-            .unwrap_or(crate::sql::connection_status::UserStatus::user_offline)
-            .to_string();
+        let (status, sequence) = state
+            .presence
+            .observe_public_state(user_id, user.iota_id.map(|id| id.0));
         let mut map = Vec::new();
         if let Some(kind) = DataType::UserId.try_to_id(&tm) {
             map.push((kind, DataValue::SignedNumber(user_id.into())));
         }
         if let Some(kind) = DataType::UserState.try_to_id(&tm) {
-            map.push((kind, DataValue::Str(status)));
+            map.push((kind, DataValue::Str(status.to_string())));
+        }
+        if let Some(kind) = DataType::VersionNumber.try_to_id(&tm) {
+            map.push((kind, DataValue::UnsignedNumber(sequence.into())));
         }
         states.push(DataValue::Container(map));
     }
     let response = CommunicationValue::new(CommunicationType::GetStates)
         .with_id(value.require_id()?)
+        .add_typed_default(
+            DataType::Uuid,
+            DataValue::Str(state.presence.observation_epoch.to_string()),
+        )
+        .add_typed_default(
+            DataType::VersionNumber,
+            DataValue::UnsignedNumber(boundary.into()),
+        )
         .add_typed_default(DataType::UserStates, DataValue::Array(states));
     let response = if let Some(session_id) = session_id {
         response.add_typed_default(DataType::SessionId, DataValue::SignedNumber(session_id))
