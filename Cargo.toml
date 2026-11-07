@@ -19,7 +19,7 @@ bytes = "1"
 dashmap = "6.2.1"
 dotenv = "0.15.0"
 http = "1"
-iota-identity = { git = "https://github.com/TensaminDev/Iota.git", rev = "060387affdef2c683aa1e87f31fbfc1e3ff7ccf4" }
+iota-identity = { git = "https://github.com/TensaminDev/Iota.git", rev = "d84f01f3bf656a21bd7a768052c3014e5b4ee2da" }
 once_cell = "1.21.4"
 parking_lot = "0.12.5"
 rand = "0.10.2"

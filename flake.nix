@@ -11,7 +11,7 @@
       flake = false;
     };
     iota-src = {
-      url = "github:TensaminDev/Iota/060387affdef2c683aa1e87f31fbfc1e3ff7ccf4";
+      url = "github:TensaminDev/Iota/d84f01f3bf656a21bd7a768052c3014e5b4ee2da";
       flake = false;
     };
     mtp-src = {
@@ -133,7 +133,7 @@
               pname = "omega";
               version = "0.1.0";
               src = source;
-              hash = "sha256-ShX4SHzQ8j/prOJC1fliFbJ4HGE3A5Ygb854q5YVDfA=";
+              hash = "sha256-AYeHicPCcsum2aNcsJwy2pcRQCMdfzWskBGleDmAXR8=";
             };
           };
           container = self.lib.mkContainer {

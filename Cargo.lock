@@ -1257,12 +1257,13 @@ dependencies = [
 [[package]]
 name = "iota-identity"
 version = "0.1.0"
-source = "git+https://github.com/TensaminDev/Iota.git?rev=060387affdef2c683aa1e87f31fbfc1e3ff7ccf4#060387affdef2c683aa1e87f31fbfc1e3ff7ccf4"
+source = "git+https://github.com/TensaminDev/Iota.git?rev=d84f01f3bf656a21bd7a768052c3014e5b4ee2da#d84f01f3bf656a21bd7a768052c3014e5b4ee2da"
 dependencies = [
  "async-trait",
  "base64 0.22.1",
  "mtp",
  "serde",
+ "serde_json",
  "tau",
 ]
 
@@ -2719,7 +2720,7 @@ dependencies = [
 [[package]]
 name = "tau"
 version = "0.1.0"
-source = "git+https://github.com/TensaminDev/Tau.git?rev=e140d4ac71fb83d4de32a108f65355cc9d52afea#e140d4ac71fb83d4de32a108f65355cc9d52afea"
+source = "git+https://github.com/TensaminDev/Tau.git?rev=ccbdcb81df00d626da16071c4c8b0b1ec803f87c#ccbdcb81df00d626da16071c4c8b0b1ec803f87c"
 dependencies = [
  "dashmap",
  "libc",
@@ -2736,7 +2737,7 @@ dependencies = [
 [[package]]
 name = "tau-relay-protocol"
 version = "0.1.0"
-source = "git+https://github.com/TensaminDev/Tau.git?rev=e140d4ac71fb83d4de32a108f65355cc9d52afea#e140d4ac71fb83d4de32a108f65355cc9d52afea"
+source = "git+https://github.com/TensaminDev/Tau.git?rev=ccbdcb81df00d626da16071c4c8b0b1ec803f87c#ccbdcb81df00d626da16071c4c8b0b1ec803f87c"
 dependencies = [
  "base64 0.22.1",
  "mtp",
