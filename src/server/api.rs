@@ -41,6 +41,9 @@ fn route_name(parts: &[&str]) -> &'static str {
         ["api", "get", "omikron", _] => "/api/get/omikron/:id",
         ["api", "get", "registration-omikron", _] => "/api/get/registration-omikron/:id",
         ["federation", "v1", "users", "id", _] => "/federation/v1/users/id/:id",
+        ["federation", "v1", "users", "id", _, "file-signing-keys", _] => {
+            "/federation/v1/users/id/:id/file-signing-keys/:key"
+        }
         ["federation", "v1", "users", "name", _] => "/federation/v1/users/name/:username",
         ["federation", "v1", "iotas", _, "node"] => "/federation/v1/iotas/:id/node",
         [".well-known", "tensamin"] => "/.well-known/tensamin",
@@ -231,6 +234,35 @@ async fn route(
                     relay_hints: Vec::new(),
                 }),
             ))
+        }
+        [
+            "federation",
+            "v1",
+            "users",
+            "id",
+            id,
+            "file-signing-keys",
+            key_id,
+        ] if method == Method::GET => {
+            let user_id = id
+                .parse::<i64>()
+                .map_err(|_| OmegaError::Validation("invalid user ID".into()))?;
+            let key = crate::db::user_repo::file_signing_key(UserId::from(user_id), key_id).await?;
+            let authority = iota_identity::AuthorityId::for_omega(&identity.public_key_bundle())
+                .map_err(|error| OmegaError::Validation(error.to_string()))?;
+            let principal = iota_identity::PrincipalId {
+                authority,
+                user_id: u64::try_from(user_id)
+                    .map_err(|_| OmegaError::Validation("invalid user ID".into()))?,
+            };
+            let proof = iota_identity::FileSigningKeyProofV1::sign(
+                principal,
+                iota_identity::AuthorityKind::Omega,
+                &key,
+                identity.keyring(),
+            )
+            .map_err(|error| OmegaError::Validation(error.to_string()))?;
+            Ok((StatusCode::OK, json(&proof)))
         }
         ["federation", "v1", "users", "id", id] if method == Method::GET => {
             let user = get_by_user_id(UserId::from(parse_positive_id(id)?)).await?;

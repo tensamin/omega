@@ -452,7 +452,8 @@ pub async fn redeem(
     let mut user_id = None;
     for _ in 0..ID_ALLOCATION_ATTEMPTS {
         let candidate = super::user_repo::generate_protocol_id();
-        if sqlx::query("SELECT 1 FROM users WHERE id = ? LIMIT 1")
+        if sqlx::query("SELECT 1 FROM users WHERE id = ? UNION ALL SELECT 1 FROM omega_file_signing_keys WHERE user_id=? LIMIT 1")
+            .bind(candidate.0)
             .bind(candidate.0)
             .fetch_optional(&mut *transaction)
             .await?
@@ -474,6 +475,7 @@ pub async fn redeem(
     .bind(reset_token.as_bytes())
     .execute(&mut *transaction)
     .await?;
+    super::user_repo::archive_file_signing_key(&mut transaction, user_id, &public_key).await?;
     sqlx::query(
         "UPDATE user_invitations SET state = 'provisioning', redeemed_user_id = ?, \
          revision = revision + 1 \

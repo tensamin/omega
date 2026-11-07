@@ -165,7 +165,8 @@ async fn allocate_registration_with_pool(
 
     for _ in 0..ID_ALLOCATION_ATTEMPTS {
         let id = generate_protocol_id();
-        let user_exists = sqlx::query("SELECT 1 FROM users WHERE id = ? LIMIT 1")
+        let user_exists = sqlx::query("SELECT 1 FROM users WHERE id = ? UNION ALL SELECT 1 FROM omega_file_signing_keys WHERE user_id=? LIMIT 1")
+            .bind(id.0)
             .bind(id.0)
             .fetch_optional(database)
             .await?
@@ -499,6 +500,15 @@ async fn update_user_patch_with_pool(
         .map(PublicKeyBundle::try_as_bytes)
         .transpose()?;
     let mut transaction = database.begin().await?;
+    if public_key.is_some() {
+        let previous =
+            sqlx::query_scalar::<_, Vec<u8>>("SELECT public_key FROM users WHERE id=? FOR UPDATE")
+                .bind(id.0)
+                .fetch_optional(&mut *transaction)
+                .await?
+                .ok_or(OmegaError::NotFound)?;
+        archive_file_signing_key(&mut transaction, id, &previous).await?;
+    }
     let mut query = QueryBuilder::<MySql>::new("UPDATE users SET ");
     {
         let mut fields = query.separated(", ");
@@ -545,8 +555,60 @@ async fn update_user_patch_with_pool(
     {
         return Err(OmegaError::NotFound);
     }
+    if let Some(key) = &public_key {
+        archive_file_signing_key(&mut transaction, id, key).await?;
+    }
     transaction.commit().await?;
     Ok(())
+}
+
+pub(super) async fn archive_file_signing_key(
+    transaction: &mut sqlx::Transaction<'_, MySql>,
+    user: UserId,
+    bytes: &[u8],
+) -> Result<()> {
+    let key_id = mtp::crypto::sha256(bytes)
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect::<String>();
+    sqlx::query("INSERT INTO omega_file_signing_keys(user_id,key_id,public_key) VALUES(?,?,?) ON DUPLICATE KEY UPDATE key_id=VALUES(key_id)")
+        .bind(user.0).bind(key_id).bind(bytes).execute(&mut **transaction).await?;
+    Ok(())
+}
+
+pub async fn file_signing_key(user: UserId, key_id: &str) -> Result<PublicKeyBundle> {
+    if user.0 < 1 || !iota_identity::valid_file_signing_key_id(key_id) {
+        return Err(OmegaError::Validation(
+            "invalid file signing key lookup".into(),
+        ));
+    }
+    file_signing_key_with_pool(&pool().await?, user, key_id).await
+}
+
+async fn file_signing_key_with_pool(
+    database: &DbPool,
+    user: UserId,
+    key_id: &str,
+) -> Result<PublicKeyBundle> {
+    let row = sqlx::query_scalar::<_, Option<Vec<u8>>>(
+        "SELECT CASE WHEN OCTET_LENGTH(public_key)<=262144 THEN public_key ELSE NULL END FROM omega_file_signing_keys WHERE user_id=? AND key_id=?",
+    )
+    .bind(user.0)
+    .bind(key_id)
+    .fetch_optional(database)
+    .await?
+    .ok_or(OmegaError::NotFound)?.ok_or_else(||OmegaError::Validation("archived public key exceeds its byte limit".into()))?;
+    let key = PublicKeyBundle::from_bytes(&row)
+        .map_err(|_| OmegaError::Validation("invalid archived file signing key".into()))?;
+    if iota_identity::file_signing_key_id(&key)
+        .map_err(|_| OmegaError::Validation("invalid archived file signing key".into()))?
+        != key_id
+    {
+        return Err(OmegaError::Validation(
+            "archived file signing key fingerprint mismatch".into(),
+        ));
+    }
+    Ok(key)
 }
 
 pub async fn change_iota_id(id: UserId, value: Option<IotaId>) -> Result<()> {
@@ -723,6 +785,14 @@ pub async fn register_complete_user(
         ));
     }
 
+    let retired = sqlx::query_scalar::<_,i32>("SELECT 1 FROM omega_file_signing_keys h WHERE h.user_id=? AND NOT EXISTS(SELECT 1 FROM users u WHERE u.id=h.user_id) LIMIT 1")
+        .bind(id.0).fetch_optional(&mut *transaction).await?.is_some();
+    if retired {
+        return Err(OmegaError::Validation(
+            "user ID was previously published".into(),
+        ));
+    }
+
     let insert_result = sqlx::query(
         "INSERT INTO users (id, username, public_key, iota_id, token) VALUES (?, ?, ?, ?, ?)",
     )
@@ -759,6 +829,7 @@ pub async fn register_complete_user(
         }
     };
     result?;
+    archive_file_signing_key(&mut transaction, id, &public_key_bytes).await?;
     enqueue_iota_snapshot(&mut transaction, iota_id.0).await?;
     sqlx::query("UPDATE registration_leases SET completed_at = UTC_TIMESTAMP() WHERE token = ?")
         .bind(&registration_token)
@@ -813,6 +884,8 @@ mod tests {
         )
         .execute(database)
         .await?;
+        sqlx::query("CREATE TEMPORARY TABLE omega_file_signing_keys (user_id BIGINT NOT NULL,key_id CHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,public_key MEDIUMBLOB NOT NULL,PRIMARY KEY(user_id,key_id))")
+            .execute(database).await?;
         Ok(())
     }
 
@@ -824,6 +897,70 @@ mod tests {
         assert!(!valid_protocol_id(0));
         assert!(valid_protocol_id(MAX_PROTOCOL_ID));
         assert!(!valid_protocol_id(MAX_PROTOCOL_ID + 1));
+    }
+
+    #[tokio::test]
+    #[ignore = "requires TEST_DB_URL pointing to a disposable MySQL database"]
+    async fn key_replacement_archives_both_keys_atomically_and_history_survives_erasure()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let database = test_pool().await?;
+        create_temp_users(&database).await?;
+        let first = mtp::crypto::Keyring::generate().public_key_bundle();
+        let second = mtp::crypto::Keyring::generate().public_key_bundle();
+        let first_id = iota_identity::file_signing_key_id(&first)?;
+        let second_id = iota_identity::file_signing_key_id(&second)?;
+        sqlx::query("INSERT INTO users(id,username,public_key,presence_preference) VALUES(7,'alice',?,'online')")
+            .bind(first.try_as_bytes()?).execute(&database).await?;
+        let patch = UserPatch {
+            public_key: Some(second.clone()),
+            ..UserPatch::default()
+        };
+        update_user_patch_with_pool(&database, UserId::from(7), &patch).await?;
+        assert_eq!(
+            super::file_signing_key_with_pool(&database, UserId::from(7), &first_id)
+                .await?
+                .try_as_bytes()?,
+            first.try_as_bytes()?
+        );
+        assert_eq!(
+            super::file_signing_key_with_pool(&database, UserId::from(7), &second_id)
+                .await?
+                .try_as_bytes()?,
+            second.try_as_bytes()?
+        );
+        assert!(
+            super::file_signing_key_with_pool(&database, UserId::from(8), &first_id)
+                .await
+                .is_err()
+        );
+        sqlx::query("DELETE FROM users WHERE id=7")
+            .execute(&database)
+            .await?;
+        super::file_signing_key_with_pool(&database, UserId::from(7), &first_id).await?;
+        // A storage failure must roll back the user mutation as well as history.
+        sqlx::query("INSERT INTO users(id,username,public_key,presence_preference) VALUES(8,'bob',?,'online')")
+            .bind(first.try_as_bytes()?).execute(&database).await?;
+        // CHECK constraints cannot bind parameters. This value is generated by
+        // SHA-256 above and contains only lowercase hexadecimal bytes.
+        assert!(iota_identity::valid_file_signing_key_id(&second_id));
+        sqlx::query(sqlx::AssertSqlSafe(format!("ALTER TABLE omega_file_signing_keys ADD CONSTRAINT refuse_new_key CHECK(user_id != 8 OR key_id != '{second_id}')")))
+            .execute(&database)
+            .await?;
+        assert!(
+            update_user_patch_with_pool(&database, UserId::from(8), &patch)
+                .await
+                .is_err()
+        );
+        let retained: Vec<u8> = sqlx::query_scalar("SELECT public_key FROM users WHERE id=8")
+            .fetch_one(&database)
+            .await?;
+        assert_eq!(retained, first.try_as_bytes()?);
+        let count: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM omega_file_signing_keys WHERE user_id=8")
+                .fetch_one(&database)
+                .await?;
+        assert_eq!(count, 0);
+        Ok(())
     }
 
     #[test]

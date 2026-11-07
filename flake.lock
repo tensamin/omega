@@ -3,17 +3,17 @@
     "iota-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1793217723,
-        "narHash": "sha256-bOjW4tZq0DIIc00EhsnduW7RZ4+w13h/dgJT1wjuZT0=",
+        "lastModified": 1794061596,
+        "narHash": "sha256-9PYG9fxOtInVqbYQpinRf+1IBN2KPfhEkDZS555OWpg=",
         "owner": "TensaminDev",
         "repo": "Iota",
-        "rev": "060387affdef2c683aa1e87f31fbfc1e3ff7ccf4",
+        "rev": "d84f01f3bf656a21bd7a768052c3014e5b4ee2da",
         "type": "github"
       },
       "original": {
         "owner": "TensaminDev",
         "repo": "Iota",
-        "rev": "060387affdef2c683aa1e87f31fbfc1e3ff7ccf4",
+        "rev": "d84f01f3bf656a21bd7a768052c3014e5b4ee2da",
         "type": "github"
       }
     },
