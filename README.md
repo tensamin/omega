@@ -33,6 +33,6 @@ both forms are rejected:
 
 ## Resource limits
 
-Short links accept HTTPS targets up to `OMEGA_SHORT_LINK_MAX_TARGET_BYTES` bytes (default 2048). Each authenticated Omikron can hold at most `OMEGA_SHORT_LINK_MAX_PER_OMIKRON` links (default 10000); allocation retries stop after `OMEGA_SHORT_LINK_INSERT_ATTEMPTS` (default 16). Existing links created before migration are unassigned and remain valid. `OMEGA_RELAY_MAX_CONCURRENT` defaults to 16 outstanding relays per connection; `OMEGA_RELAY_BYTES_PER_WINDOW` defaults to 64 MiB of encrypted payload per `OMEGA_RELAY_WINDOW_SECONDS` (default 60).
+Short links accept HTTPS targets up to `OMEGA_SHORT_LINK_MAX_TARGET_BYTES` bytes (default 2048). Each authenticated Omikron can hold at most `OMEGA_SHORT_LINK_MAX_PER_OMIKRON` links (default 10000); allocation retries stop after `OMEGA_SHORT_LINK_INSERT_ATTEMPTS` (default 16). `OMEGA_RELAY_MAX_CONCURRENT` defaults to 16 outstanding relays per connection; `OMEGA_RELAY_BYTES_PER_WINDOW` defaults to 64 MiB of encrypted payload per `OMEGA_RELAY_WINDOW_SECONDS` (default 60).
 
 SQL pool defaults to 200 maximum and zero minimum connections. Override `OMEGA_DB_MAX_CONNECTIONS`, `OMEGA_DB_MIN_CONNECTIONS`, `OMEGA_DB_ACQUIRE_TIMEOUT_SECONDS`, `OMEGA_DB_IDLE_TIMEOUT_SECONDS`, and `OMEGA_DB_MAX_LIFETIME_SECONDS` as needed.

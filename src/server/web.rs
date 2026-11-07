@@ -60,6 +60,7 @@ pub fn build_web_config(
     WebServerConfig::new()
         .with_metrics(Arc::new(TransportMetrics))
         .route("/.well-known/tensamin", api_handler(state.clone()))?
+        .route("/federation/v1/locator", api_handler(state.clone()))?
         .route("/api/download/iota_frontend", api_handler(state.clone()))?
         .route("/api/get/omikron", api_handler(state.clone()))?
         .route("/api/get/public_key", api_handler(state.clone()))?

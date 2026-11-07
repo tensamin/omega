@@ -46,6 +46,7 @@ fn route_name(parts: &[&str]) -> &'static str {
         }
         ["federation", "v1", "users", "name", _] => "/federation/v1/users/name/:username",
         ["federation", "v1", "iotas", _, "node"] => "/federation/v1/iotas/:id/node",
+        ["federation", "v1", "locator"] => "/federation/v1/locator",
         [".well-known", "tensamin"] => "/.well-known/tensamin",
         ["api", "get", "omikron"] => "/api/get/omikron",
         ["api", "get", "public_key"] => "/api/get/public_key",
@@ -216,6 +217,26 @@ async fn route(
     state: &OmegaState,
 ) -> Result<(StatusCode, String)> {
     match path_parts {
+        ["federation", "v1", "locator"] if method == Method::GET => {
+            let public_url = crate::config::public_urls()
+                .map_err(|error| OmegaError::Validation(error.to_string()))?
+                .omega_base_url;
+            let uri = public_url
+                .parse::<http::Uri>()
+                .map_err(|error| OmegaError::Validation(error.to_string()))?;
+            let locator = iota_identity::AuthorityLocator::new(
+                uri.authority()
+                    .ok_or_else(|| {
+                        OmegaError::Validation("Omega public URL has no authority".into())
+                    })?
+                    .as_str(),
+            )
+            .map_err(|error| OmegaError::Validation(error.to_string()))?;
+            let proof =
+                iota_identity::OmegaLocatorProofV1::sign(locator, identity.keyring(), now_millis())
+                    .map_err(|error| OmegaError::Validation(error.to_string()))?;
+            Ok((StatusCode::OK, json(&proof)))
+        }
         [".well-known", "tensamin"] if method == Method::GET => {
             let public_key = identity.public_key_bundle();
             let authority_id = iota_identity::AuthorityId::for_omega(&public_key)

@@ -3,34 +3,34 @@
     "iota-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1794061596,
-        "narHash": "sha256-9PYG9fxOtInVqbYQpinRf+1IBN2KPfhEkDZS555OWpg=",
+        "lastModified": 1794092139,
+        "narHash": "sha256-MnWPcKEBgI0aZRLZeMvJEQwQ8PwVXCpz4uwQSMRTnsc=",
         "owner": "TensaminDev",
         "repo": "Iota",
-        "rev": "d84f01f3bf656a21bd7a768052c3014e5b4ee2da",
+        "rev": "71147b800b16f0ea74e44d021e0067d32e8fc957",
         "type": "github"
       },
       "original": {
         "owner": "TensaminDev",
         "repo": "Iota",
-        "rev": "d84f01f3bf656a21bd7a768052c3014e5b4ee2da",
+        "rev": "71147b800b16f0ea74e44d021e0067d32e8fc957",
         "type": "github"
       }
     },
     "mtp-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1793191985,
-        "narHash": "sha256-ZdN5I6IDRprF52quAptff1GeKDsT8swTThYg7TNMiPc=",
+        "lastModified": 1794088961,
+        "narHash": "sha256-2IPy6EQV/s01kKmhpWEyyZmpqULsccyJs9L3QxEzq+A=",
         "owner": "Nonanium",
         "repo": "MTP",
-        "rev": "87c535650a3a33b166139b02cdd7327d412d3bca",
+        "rev": "eef7562be64e77d8c29ba5af6df7596073e3c9f2",
         "type": "github"
       },
       "original": {
         "owner": "Nonanium",
         "repo": "MTP",
-        "rev": "87c535650a3a33b166139b02cdd7327d412d3bca",
+        "rev": "eef7562be64e77d8c29ba5af6df7596073e3c9f2",
         "type": "github"
       }
     },
@@ -83,17 +83,17 @@
     "tau-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1793217305,
-        "narHash": "sha256-TT/DC7QSLt3SMh+arMjcQScunbiEY1eED3pbSa0uIN0=",
+        "lastModified": 1794089167,
+        "narHash": "sha256-Sc/xlbKM7g1ubFTWYTUc8KVKcreTahOj/hbm1lWm3JI=",
         "owner": "TensaminDev",
         "repo": "Tau",
-        "rev": "e140d4ac71fb83d4de32a108f65355cc9d52afea",
+        "rev": "d6183368f3e2b91b3c3d86eae3802654b349be10",
         "type": "github"
       },
       "original": {
         "owner": "TensaminDev",
         "repo": "Tau",
-        "rev": "e140d4ac71fb83d4de32a108f65355cc9d52afea",
+        "rev": "d6183368f3e2b91b3c3d86eae3802654b349be10",
         "type": "github"
       }
     },

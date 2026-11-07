@@ -321,7 +321,7 @@ mod tests {
             .max_connections(4)
             .connect(&std::env::var("TEST_DB_URL")?)
             .await?;
-        sqlx::migrate!().run(&database).await?;
+        crate::db::initialize_schema(&database).await?;
         Ok(database)
     }
 

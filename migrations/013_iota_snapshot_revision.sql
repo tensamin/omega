@@ -1,2 +1,0 @@
-ALTER TABLE iota_snapshot_outbox
-    ADD COLUMN revision BIGINT UNSIGNED NOT NULL DEFAULT 1;

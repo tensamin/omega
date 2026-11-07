@@ -34,10 +34,14 @@ pub async fn initialize(config: &crate::config::DatabaseConfig) -> Result<()> {
         .max_lifetime(config.max_lifetime)
         .connect(&url)
         .await?;
-    sqlx::migrate!()
-        .run(&pool)
-        .await
-        .map_err(|error| OmegaError::Validation(format!("database migration failed: {error}")))?;
+    initialize_schema(&pool).await?;
     *POOL.write().await = Some(pool);
+    Ok(())
+}
+
+pub(crate) async fn initialize_schema(pool: &DbPool) -> Result<()> {
+    sqlx::raw_sql(include_str!("schema.sql"))
+        .execute(pool)
+        .await?;
     Ok(())
 }

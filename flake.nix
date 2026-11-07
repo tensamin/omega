@@ -11,15 +11,15 @@
       flake = false;
     };
     iota-src = {
-      url = "github:TensaminDev/Iota/d84f01f3bf656a21bd7a768052c3014e5b4ee2da";
+      url = "github:TensaminDev/Iota/71147b800b16f0ea74e44d021e0067d32e8fc957";
       flake = false;
     };
     mtp-src = {
-      url = "github:Nonanium/MTP/87c535650a3a33b166139b02cdd7327d412d3bca";
+      url = "github:Nonanium/MTP/eef7562be64e77d8c29ba5af6df7596073e3c9f2";
       flake = false;
     };
     tau-src = {
-      url = "github:TensaminDev/Tau/e140d4ac71fb83d4de32a108f65355cc9d52afea";
+      url = "github:TensaminDev/Tau/d6183368f3e2b91b3c3d86eae3802654b349be10";
       flake = false;
     };
   };
@@ -133,7 +133,7 @@
               pname = "omega";
               version = "0.1.0";
               src = source;
-              hash = "sha256-AYeHicPCcsum2aNcsJwy2pcRQCMdfzWskBGleDmAXR8=";
+              hash = "sha256-nithCqaetGXH910xH8kE2slTAdpS0EtZmP1T+nlxXVo=";
             };
           };
           container = self.lib.mkContainer {
