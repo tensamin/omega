@@ -80,6 +80,10 @@ pub fn build_web_config(
             api_pattern_handler(state.clone()),
         )?
         .route_pattern(
+            "/federation/v1/users/id/{id}/file-signing-keys/{key}",
+            api_pattern_handler(state.clone()),
+        )?
+        .route_pattern(
             "/federation/v1/users/name/{username}",
             api_pattern_handler(state.clone()),
         )?
