@@ -145,6 +145,8 @@ CREATE TABLE IF NOT EXISTS omega_principal_descriptors (
     CONSTRAINT fk_omega_principal_descriptors_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
 );
 
+-- Public key evidence survives account deletion so historical file signatures remain verifiable.
+-- There is intentionally no cascading foreign key to users.
 CREATE TABLE IF NOT EXISTS omega_file_signing_keys (
     user_id BIGINT NOT NULL,
     key_id CHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
