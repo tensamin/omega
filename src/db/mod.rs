@@ -63,33 +63,27 @@ pub(crate) async fn initialize_schema(pool: &DbPool) -> Result<()> {
         "incompatible database format; initialize a fresh Omega database instead of upgrading this store".into(),
     )
     };
-    if !has_marker {
-        if has_other_tables {
-            return Err(incompatible());
-        }
-        sqlx::raw_sql(include_str!("format.sql"))
-            .execute(&mut *connection)
-            .await?;
+    if !has_marker && has_other_tables {
+        return Err(incompatible());
     }
-    let format: Option<String> =
+    let format: Option<String> = if has_marker {
         sqlx::query_scalar("SELECT format_name FROM omega_storage_format WHERE singleton=1")
             .fetch_optional(&mut *connection)
-            .await?;
+            .await?
+    } else {
+        None
+    };
     if format.as_deref() == Some(STORAGE_FORMAT) {
         connection.close().await?;
         return Ok(());
     }
     let initializing = format!("{STORAGE_FORMAT}:initializing");
-    if format.is_none() && !has_other_tables {
-        sqlx::query("INSERT INTO omega_storage_format(singleton,format_name) VALUES(1,?)")
-            .bind(&initializing)
-            .execute(&mut *connection)
-            .await?;
-    } else if format.as_deref() != Some(initializing.as_str()) {
+    if format.as_deref() != Some(initializing.as_str()) && (format.is_some() || has_other_tables)
+    {
         return Err(incompatible());
     }
     // Only a marked fresh setup can resume nontransactional CREATE TABLE statements.
-    sqlx::raw_sql(include_str!("schema.sql"))
+    sqlx::raw_sql(include_str!("../../migrations/0001_initial.sql"))
         .execute(&mut *connection)
         .await?;
     let completed = sqlx::query(

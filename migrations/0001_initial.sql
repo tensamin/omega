@@ -1,3 +1,12 @@
+CREATE TABLE IF NOT EXISTS omega_storage_format (
+    singleton TINYINT UNSIGNED NOT NULL PRIMARY KEY CHECK (singleton=1),
+    format_name VARCHAR(32) CHARACTER SET ascii COLLATE ascii_bin NOT NULL
+);
+
+INSERT INTO omega_storage_format (singleton, format_name)
+SELECT 1, 'omega-storage:1:initializing'
+WHERE NOT EXISTS (SELECT 1 FROM omega_storage_format WHERE singleton=1);
+
 CREATE TABLE IF NOT EXISTS iotas (
     id BIGINT NOT NULL PRIMARY KEY,
     public_key BLOB NOT NULL,
