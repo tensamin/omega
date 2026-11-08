@@ -5,7 +5,7 @@ edition = "2024"
 
 [dependencies]
 libc = "0.2"
-mtp = { git = "https://github.com/Nonanium/MTP.git", rev = "87c535650a3a33b166139b02cdd7327d412d3bca", features = [
+mtp = { git = "https://github.com/Nonanium/MTP.git", rev = "eef7562be64e77d8c29ba5af6df7596073e3c9f2", features = [
     "crypto",
     "files",
     "raw",
@@ -19,7 +19,7 @@ bytes = "1"
 dashmap = "6.2.1"
 dotenv = "0.15.0"
 http = "1"
-iota-identity = { git = "https://github.com/TensaminDev/Iota.git", rev = "060387affdef2c683aa1e87f31fbfc1e3ff7ccf4" }
+iota-identity = { git = "https://github.com/TensaminDev/Iota.git", rev = "71147b800b16f0ea74e44d021e0067d32e8fc957" }
 once_cell = "1.21.4"
 parking_lot = "0.12.5"
 rand = "0.10.2"
@@ -29,7 +29,7 @@ rustls = { version = "0.23.43", default-features = false, features = [
     "aws-lc-rs",
     "prefer-post-quantum",
 ] }
-sqlx = { version = "0.9.0", features = ["mysql", "runtime-tokio", "migrate"] }
+sqlx = { version = "0.9.0", features = ["mysql", "runtime-tokio"] }
 tokio = { version = "*", features = ["full"] }
 tokio-util = { version = "0.7.19", features = ["rt"] }
 uuid = { version = "1.26.0", features = ["v4", "v7"] }

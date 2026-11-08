@@ -60,10 +60,15 @@ pub fn build_web_config(
     WebServerConfig::new()
         .with_metrics(Arc::new(TransportMetrics))
         .route("/.well-known/tensamin", api_handler(state.clone()))?
+        .route("/federation/v1/locator", api_handler(state.clone()))?
         .route("/api/download/iota_frontend", api_handler(state.clone()))?
         .route("/api/get/omikron", api_handler(state.clone()))?
         .route("/api/get/public_key", api_handler(state.clone()))?
         .route_pattern("/api/get/omikron/{id}", api_pattern_handler(state.clone()))?
+        .route_pattern(
+            "/api/get/user/{id}/omikron",
+            api_pattern_handler(state.clone()),
+        )?
         .route_pattern(
             "/api/get/registration-omikron/{id}",
             api_pattern_handler(state.clone()),
@@ -73,6 +78,10 @@ pub fn build_web_config(
         .route_pattern("/api/get/user/{id}", api_pattern_handler(state.clone()))?
         .route_pattern(
             "/federation/v1/users/id/{id}",
+            api_pattern_handler(state.clone()),
+        )?
+        .route_pattern(
+            "/federation/v1/users/id/{id}/file-signing-keys/{key}",
             api_pattern_handler(state.clone()),
         )?
         .route_pattern(

@@ -1,6 +1,7 @@
 use crate::sql::connection_status::UserStatus;
 use parking_lot::RwLock;
 use std::collections::{HashMap, HashSet};
+use std::sync::atomic::{AtomicU64, Ordering};
 
 fn select_primary_route(previous_primary: Option<i64>, connected: &HashSet<i64>) -> Option<i64> {
     previous_primary
@@ -69,6 +70,8 @@ pub struct RemovedOmikronState {
 pub struct PresenceTracker {
     pub(crate) routes: RwLock<PresenceRoutes>,
     preferences: RwLock<HashMap<i64, UserStatus>>,
+    pub observation_epoch: uuid::Uuid,
+    observation_sequence: AtomicU64,
 }
 
 impl Default for PresenceTracker {
@@ -76,6 +79,8 @@ impl Default for PresenceTracker {
         Self {
             routes: RwLock::new(PresenceRoutes::default()),
             preferences: RwLock::new(HashMap::new()),
+            observation_epoch: uuid::Uuid::new_v4(),
+            observation_sequence: AtomicU64::new(0),
         }
     }
 }
@@ -300,6 +305,7 @@ impl PresenceTracker {
             .unwrap_or(UserStatus::user_online)
     }
 
+    #[cfg(test)]
     pub fn has_iota_route(&self, iota_id: i64) -> bool {
         self.routes
             .read()
@@ -316,8 +322,13 @@ impl PresenceTracker {
             .is_some_and(|route| route.connected_omikron_ids.contains(&omikron_id))
     }
 
+    #[cfg(test)]
     pub fn has_active_session_for_iota(&self, user_id: i64, iota_id: i64) -> bool {
         let routes = self.routes.read();
+        Self::active_session_for_iota(&routes, user_id, iota_id)
+    }
+
+    fn active_session_for_iota(routes: &PresenceRoutes, user_id: i64, iota_id: i64) -> bool {
         routes
             .indices
             .sessions_by_user
@@ -381,13 +392,44 @@ impl PresenceTracker {
     }
 
     pub fn resolve_public_state(&self, user_id: i64, iota_id: i64) -> UserStatus {
-        if !self.has_iota_route(iota_id) {
-            return UserStatus::iota_offline;
-        }
-        if !self.has_active_session_for_iota(user_id, iota_id) {
-            return UserStatus::user_offline;
-        }
-        self.preference(user_id).public_value()
+        self.observe_public_state(user_id, Some(iota_id)).0
+    }
+
+    /// Sequence the observation while both inputs are locked. Delayed pushes
+    /// can then be compared with snapshots without ordering network tasks.
+    pub fn observe_public_state(&self, user_id: i64, iota_id: Option<i64>) -> (UserStatus, u64) {
+        let routes = self.routes.read();
+        let preferences = self.preferences.read();
+        let state = match iota_id {
+            None => UserStatus::user_offline,
+            Some(id)
+                if !routes
+                    .iotas
+                    .get(&id)
+                    .is_some_and(|route| !route.connected_omikron_ids.is_empty()) =>
+            {
+                UserStatus::iota_offline
+            }
+            Some(id) if !Self::active_session_for_iota(&routes, user_id, id) => {
+                UserStatus::user_offline
+            }
+            Some(_) => preferences
+                .get(&user_id)
+                .cloned()
+                .unwrap_or(UserStatus::user_online)
+                .public_value(),
+        };
+        let sequence = self.observation_boundary();
+        (state, sequence)
+    }
+
+    pub fn observation_boundary(&self) -> u64 {
+        self.observation_sequence
+            .try_update(Ordering::Relaxed, Ordering::Relaxed, |sequence| {
+                sequence.checked_add(1)
+            })
+            .expect("presence observation sequence exhausted")
+            + 1
     }
 
     pub fn resolve_private_state(&self, user_id: i64) -> UserStatus {
@@ -691,6 +733,27 @@ mod tests {
 
     fn check_index_consistency(tracker: &PresenceTracker) -> Result<(), String> {
         PresenceTracker::check_indices(&tracker.routes.read())
+    }
+
+    #[test]
+    fn presence_observations_order_delayed_pushes_against_snapshots_and_restart() {
+        let tracker = PresenceTracker::default();
+        tracker.connect_iota(11, 42);
+        tracker.track_session(7, 3, 42, 11);
+        let (online, old_push) = tracker.observe_public_state(7, Some(11));
+        tracker.set_preference(7, UserStatus::user_dnd);
+        let boundary = tracker.observation_boundary();
+        let (dnd, snapshot) = tracker.observe_public_state(7, Some(11));
+        tracker.disconnect_iota(11, 42);
+        let (offline, newer_push) = tracker.observe_public_state(7, Some(11));
+        assert_eq!(online, UserStatus::user_online);
+        assert_eq!(dnd, UserStatus::user_dnd);
+        assert_eq!(offline, UserStatus::iota_offline);
+        assert!(old_push < boundary && boundary < snapshot && snapshot < newer_push);
+        assert_ne!(
+            tracker.observation_epoch,
+            PresenceTracker::default().observation_epoch
+        );
     }
 
     #[test]

@@ -33,6 +33,7 @@ fn route_name(parts: &[&str]) -> &'static str {
     match parts {
         ["api", "download", "iota_frontend"] => "/api/download/iota_frontend",
         ["api", "get", "user", _] => "/api/get/user/:id",
+        ["api", "get", "user", _, "omikron"] => "/api/get/user/:id/omikron",
         ["direct", ..] => "/direct/:short",
         ["api", "get", "id", _] => "/api/get/id/:username",
         ["api", "get", "iota", _] => "/api/get/iota/:id",
@@ -40,8 +41,12 @@ fn route_name(parts: &[&str]) -> &'static str {
         ["api", "get", "omikron", _] => "/api/get/omikron/:id",
         ["api", "get", "registration-omikron", _] => "/api/get/registration-omikron/:id",
         ["federation", "v1", "users", "id", _] => "/federation/v1/users/id/:id",
+        ["federation", "v1", "users", "id", _, "file-signing-keys", _] => {
+            "/federation/v1/users/id/:id/file-signing-keys/:key"
+        }
         ["federation", "v1", "users", "name", _] => "/federation/v1/users/name/:username",
         ["federation", "v1", "iotas", _, "node"] => "/federation/v1/iotas/:id/node",
+        ["federation", "v1", "locator"] => "/federation/v1/locator",
         [".well-known", "tensamin"] => "/.well-known/tensamin",
         ["api", "get", "omikron"] => "/api/get/omikron",
         ["api", "get", "public_key"] => "/api/get/public_key",
@@ -212,6 +217,26 @@ async fn route(
     state: &OmegaState,
 ) -> Result<(StatusCode, String)> {
     match path_parts {
+        ["federation", "v1", "locator"] if method == Method::GET => {
+            let public_url = crate::config::public_urls()
+                .map_err(|error| OmegaError::Validation(error.to_string()))?
+                .omega_base_url;
+            let uri = public_url
+                .parse::<http::Uri>()
+                .map_err(|error| OmegaError::Validation(error.to_string()))?;
+            let locator = iota_identity::AuthorityLocator::new(
+                uri.authority()
+                    .ok_or_else(|| {
+                        OmegaError::Validation("Omega public URL has no authority".into())
+                    })?
+                    .as_str(),
+            )
+            .map_err(|error| OmegaError::Validation(error.to_string()))?;
+            let proof =
+                iota_identity::OmegaLocatorProofV1::sign(locator, identity.keyring(), now_millis())
+                    .map_err(|error| OmegaError::Validation(error.to_string()))?;
+            Ok((StatusCode::OK, json(&proof)))
+        }
         [".well-known", "tensamin"] if method == Method::GET => {
             let public_key = identity.public_key_bundle();
             let authority_id = iota_identity::AuthorityId::for_omega(&public_key)
@@ -230,6 +255,35 @@ async fn route(
                     relay_hints: Vec::new(),
                 }),
             ))
+        }
+        [
+            "federation",
+            "v1",
+            "users",
+            "id",
+            id,
+            "file-signing-keys",
+            key_id,
+        ] if method == Method::GET => {
+            let user_id = id
+                .parse::<i64>()
+                .map_err(|_| OmegaError::Validation("invalid user ID".into()))?;
+            let key = crate::db::user_repo::file_signing_key(UserId::from(user_id), key_id).await?;
+            let authority = iota_identity::AuthorityId::for_omega(&identity.public_key_bundle())
+                .map_err(|error| OmegaError::Validation(error.to_string()))?;
+            let principal = iota_identity::PrincipalId {
+                authority,
+                user_id: u64::try_from(user_id)
+                    .map_err(|_| OmegaError::Validation("invalid user ID".into()))?,
+            };
+            let proof = iota_identity::FileSigningKeyProofV1::sign(
+                principal,
+                iota_identity::AuthorityKind::Omega,
+                &key,
+                identity.keyring(),
+            )
+            .map_err(|error| OmegaError::Validation(error.to_string()))?;
+            Ok((StatusCode::OK, json(&proof)))
         }
         ["federation", "v1", "users", "id", id] if method == Method::GET => {
             let user = get_by_user_id(UserId::from(parse_positive_id(id)?)).await?;
@@ -276,42 +330,16 @@ async fn route(
                 }),
             ))
         }
-        ["api", "get", "omikron", id] => {
-            let id = parse_positive_id(id)?;
-            let omikron_id = if state.connected_omikron(id).is_some() {
-                id
-            } else if let Some(omikron_id) = get_iota_primary_omikron_connection(state, id) {
-                omikron_id
-            } else {
-                let user = get_by_user_id(UserId::from(id)).await?;
-                match user.iota_id {
-                    Some(iota_id) => get_iota_primary_omikron_connection(state, iota_id.0),
-                    None => {
-                        get_random_omikron(state)
-                            .await
-                            .map_err(|_| OmegaError::NotConnected)?
-                            .get_omikron_id()
-                            .await
-                    }
-                }
-                .ok_or(OmegaError::NotFound)?
-            };
-
-            // Database rows describe registered Omikrons. The public discovery
-            // API must expose only routes backed by a currently live transport.
-            state
-                .connected_omikron(omikron_id)
-                .ok_or(OmegaError::NotFound)?;
-            let omikron = get_omikron_by_id(omikron_id.into()).await?;
+        ["api", "get", "omikron", id] if method == Method::GET => Ok((
+            StatusCode::OK,
+            json(&build_omikron_response(state, parse_positive_id(id)?).await?),
+        )),
+        ["api", "get", "user", id, "omikron"] if method == Method::GET => {
+            let user = get_by_user_id(UserId::from(parse_positive_id(id)?)).await?;
+            let iota_id = user.iota_id.ok_or(OmegaError::NotFound)?;
             Ok((
                 StatusCode::OK,
-                json(&OmikronResponse {
-                    status: "success",
-                    id: omikron.id.0,
-                    public_key: omikron.public_key.try_to_base64()?,
-                    ip_address: omikron.ip_address,
-                    port: omikron.port,
-                }),
+                json(&connected_omikron_for_iota(state, iota_id.0).await?),
             ))
         }
         ["api", "get", "iota", id, "omikron"] if method == Method::GET => {
@@ -638,6 +666,10 @@ mod tests {
     #[test]
     fn iota_omikron_discovery_has_an_explicit_route() {
         assert_eq!(
+            route_name(&["api", "get", "user", "7", "omikron"]),
+            "/api/get/user/:id/omikron"
+        );
+        assert_eq!(
             route_name(&["api", "get", "iota", "7", "omikron"]),
             "/api/get/iota/:id/omikron"
         );
@@ -645,5 +677,37 @@ mod tests {
             route_name(&["api", "get", "registration-omikron", "7"]),
             "/api/get/registration-omikron/:id"
         );
+    }
+
+    #[tokio::test]
+    async fn disconnected_owner_never_resolves_as_a_colliding_iota() {
+        let state = OmegaState::test_state();
+        state.presence.connect_iota(7, 42);
+        assert_eq!(primary_route_for_iota(&state, 7).unwrap(), 42);
+        let response = route(
+            &["api", "get", "omikron", "7"],
+            &Method::GET,
+            None,
+            &state.identity,
+            &state,
+        )
+        .await;
+        assert!(matches!(response, Err(OmegaError::NotFound)));
+    }
+
+    #[tokio::test]
+    async fn disconnected_owner_does_not_fall_through_to_user_lookup() {
+        let state = OmegaState::test_state();
+        // There is deliberately no database fixture. An owner lookup must
+        // return not-found without attempting a lookup in another namespace.
+        let response = route(
+            &["api", "get", "omikron", "7"],
+            &Method::GET,
+            None,
+            &state.identity,
+            &state,
+        )
+        .await;
+        assert!(matches!(response, Err(OmegaError::NotFound)));
     }
 }
