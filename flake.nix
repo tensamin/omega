@@ -134,7 +134,7 @@
               pname = "omega";
               version = "0.1.0";
               src = source;
-              hash = "sha256-LsDDCw2+jNdOgieXiPhm8rKABEXcqu7djY3+XyoCQ04=";
+              hash = "sha256-yFOAJ0bWpXTW7Ex+VoU+v706tTeiOGHHPs/FisVeAiE=";
             };
           };
           container = self.lib.mkContainer {
