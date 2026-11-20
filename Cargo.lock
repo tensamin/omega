@@ -1257,7 +1257,7 @@ dependencies = [
 [[package]]
 name = "iota-identity"
 version = "0.1.0"
-source = "git+https://github.com/TensaminDev/Iota.git?rev=161cb4a1242cacd631a9344d383e10575a15f96b#161cb4a1242cacd631a9344d383e10575a15f96b"
+source = "git+https://github.com/TensaminDev/Iota.git?rev=027dc544e8f84475cd84e3959eb1b6c2aae20f07#027dc544e8f84475cd84e3959eb1b6c2aae20f07"
 dependencies = [
  "async-trait",
  "base64 0.22.1",
