@@ -15,7 +15,7 @@
       flake = false;
     };
     mtp-src = {
-      url = "github:Nonanium/MTP/eef7562be64e77d8c29ba5af6df7596073e3c9f2";
+      url = "github:Nonanium/MTP/d222dc19d38aa03f538ab167ca4e4a3b187b9320";
       flake = false;
     };
     tau-src = {
@@ -134,7 +134,7 @@
               pname = "omega";
               version = "0.1.0";
               src = source;
-              hash = "sha256-nithCqaetGXH910xH8kE2slTAdpS0EtZmP1T+nlxXVo=";
+              hash = "sha256-LsDDCw2+jNdOgieXiPhm8rKABEXcqu7djY3+XyoCQ04=";
             };
           };
           container = self.lib.mkContainer {
